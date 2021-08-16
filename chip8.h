@@ -98,7 +98,7 @@ void cycle(CHIP8 *chip)
 {
     srand(time(0));
     WORD x, y, i, j, dec;
-    BYTE X, Y, N, NN, NNN, key;
+    BYTE X, Y, N, NN, NNN, key, a, b;
     BYTE sprite_byte, sprite_bit;
 
     // The values X, Y, N, NN, and NNN are always extracted the same way,
@@ -200,19 +200,44 @@ void cycle(CHIP8 *chip)
                     chip->V[X] ^= chip->V[Y];
                     break;                
                 
-                case 0x0004: // 0x8XY4: TODO Add V[Y] to V[X], set flags
+                case 0x0004: // 0x8XY4: Add V[Y] to V[X], set flags
+                    a = chip->V[X], b = chip->V[Y];
+
+                    // Detect overflow
+                    if ((a + b) < a || (a + b) < b)
+                        chip->V[0xF] = 1;
+                    else
+                        chip->V[0xF] = 0;
+
+                    chip->V[X] += b;
                     break;
                 
-                case 0x0005: // 0x8XY5: TODO Subtract V[Y] from V[X], set flags
+                case 0x0005: // 0x8XY5: Set V[X] to V[X] - V[Y], set flags
+                    if (chip->V[X] > chip->V[Y])
+                        chip->V[0xF] = 1;
+                    else if (chip->V[X] < chip->V[Y])
+                        chip->V[0xF] = 0;
+                    
+                    chip->V[X] = chip->V[X] - chip->V[Y];
                     break;
                 
-                case 0x0006: // 0x8XY6: TODO Store (V[Y] >> 1) in V[X], set flags
+                case 0x0006: // 0x8XY6: Store (V[Y] >> 1) in V[X], set flags
+                    chip->V[0xF] = chip->V[Y] & 0x1;
+                    chip->V[X] = chip->V[Y] >> 1;
                     break;
                 
-                case 0x0007: // 0x8XY7: TODO Set V[X] to V[Y] - V[X], set flags
+                case 0x0007: // 0x8XY7: Set V[X] to V[Y] - V[X], set flags
+                    if (chip->V[Y] > chip->V[X])
+                        chip->V[0xF] = 1;
+                    else if (chip->V[Y] < chip->V[X])
+                        chip->V[0xF] = 0;
+                    
+                    chip->V[X] = chip->V[Y] - chip->V[X];
                     break;
                 
-                case 0x000E: // 0x8XYE: TODO Store (V[Y] << 1) in V[x], set flags
+                case 0x000E: // 0x8XYE: Store (V[Y] << 1) in V[X], set flags
+                    chip->V[0xF] = chip->V[Y] & 0x80;
+                    chip->V[X] = chip->V[Y] << 1;
                     break;
                 
                 default:
