@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include "chip8.h"
 
-BYTE prog[494];
+BYTE prog[132];
 
 int main(int argc, char **argv)
 {
@@ -16,19 +16,17 @@ int main(int argc, char **argv)
     init_chip(&chip);
 
     program = fopen("TETRIS", "rb");
-    fread(prog, 1, 494, program);
+    fread(prog, 1, 132, program);
 
     // Load chip8 game
-    for (i = 0; i < 494; i++)
+    for (i = 0; i < 132; i++)
     {
+        chip.memory[i + 0x200] = prog[i];
     }
 
     while (1)
     {
-        break;
-        // Fetch Opcode
-        // Decode Opcode
-        // Execute Opcode
+        cycle(&chip);
 
         // Update timers
 
@@ -39,12 +37,3 @@ int main(int argc, char **argv)
 
     return 0;
 }
-
-// for (i = 0; i < 474; i++)
-// {
-//     printf("0x%X \t", prog[i]);
-//     if (i % 3 == 0)
-//     {
-//         printf("\n");
-//     }
-// }

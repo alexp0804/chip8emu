@@ -83,7 +83,7 @@ void init_chip(CHIP8 *chip)
 // Convert an x,y coordinate into a one-dimensional number for writing/reading from the screen
 BYTE IX(x, y)
 {
-    return 
+    return x * 64 + y;
 }
 
 void fetch(CHIP8 *chip)
