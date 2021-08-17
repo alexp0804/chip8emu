@@ -1,9 +1,13 @@
 
 #include <time.h>
 #include <stdlib.h>
+#include <stdio.h>
 
-typedef unsigned char BYTE;
-typedef unsigned short WORD;
+typedef uint8_t BYTE;
+typedef uint16_t WORD;
+
+#define WIDTH 64
+#define HEIGHT 32
 
 BYTE fonts[0x50] = {
     0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
@@ -29,15 +33,21 @@ typedef struct CHIP8
     WORD stack[0x10];    // 16-bit stack with max length of 16
     BYTE V[0x10];        // 16 8-bit registers
     BYTE memory[0x1000]; // 8-bit memory with 2048 addressable locations
-    BYTE screen[0x800];  // 64*32 resolution, each pixel is 1 or 0
+    BYTE screen[64*32];  // 64*32 resolution, each pixel is 1 or 0
     BYTE keys[0x10];     // Hex-based input
     WORD op;             // Current opcode
-    BYTE I;              // Index register
-    BYTE pc;             // Program counter
+    WORD pc;             // Program counter
+    WORD I;              // Index register
     BYTE sp;             // Stack pointer
     BYTE delay;          // Delay timer (both timers count downwards to zero)
     BYTE sound;          // Sound timer
+    BYTE draw;
 } CHIP8;
+
+unsigned int IX(BYTE x, BYTE y)
+{
+    return y * WIDTH + x;
+}
 
 // Most fields in the CHIP8 structure should be set to 0 on allocation, but
 // some special initializations are needed (program counter and fontset)
@@ -45,9 +55,9 @@ typedef struct CHIP8
 // to zero.
 void init_chip(CHIP8 *chip)
 {
-    int i;
+    int i, j;
 
-    chip->pc = (BYTE)0x200; // PC starts at 0x200
+    chip->pc = 0x200;       // PC starts at 0x200
     chip->op = 0;           // Reset opcode
     chip->I = 0;            // Reset index register
     chip->sp = 0;           // Reset stack pointer
@@ -55,7 +65,7 @@ void init_chip(CHIP8 *chip)
     chip->sound = 0;
 
     // Reset display
-    for (i = 0; i < 0x800; i++)
+    for (i = 0; i < 64*32; i++)
     {
         chip->screen[i] = 0;
     }
@@ -80,29 +90,28 @@ void init_chip(CHIP8 *chip)
     }
 }
 
-// Convert an x,y coordinate into a one-dimensional number for writing/reading from the screen
-BYTE IX(x, y)
-{
-    return x * 64 + y;
-}
-
 void fetch(CHIP8 *chip)
 {
     // Opcodes are words, stored in memory at PC and PC + 1.
     // Shift (PC) and or with (PC + 1) to get opcode.
+
     chip->op = (chip->memory[chip->pc] << 0x8) | (chip->memory[chip->pc + 1]);
     chip->pc += 2;
 }
 
 void cycle(CHIP8 *chip)
 {
-    srand(time(0));
     WORD x, y, i, j, dec;
     BYTE X, Y, N, NN, NNN, key, a, b;
     BYTE sprite_byte, sprite_bit;
 
+    srand(time(0));
+
+    // Get next instruction
+    fetch(chip);
+
     // The values X, Y, N, NN, and NNN are always extracted the same way,
-    // so extracting them here will save a lot of code.
+    // so doing it here will save a lot of code.
     // They are:
     //      X   = 0x_X__
     //      Y   = 0x__Y_
@@ -116,9 +125,6 @@ void cycle(CHIP8 *chip)
     NN  = (chip->op & 0x00FF);
     NNN = (chip->op & 0x0FFF);
 
-    // Get next instruction
-    fetch(chip);
-
     // Start with just the most significant nibble.
     // We can identify *most* instructions with just this information.
     switch (chip->op & 0xF000)
@@ -127,18 +133,18 @@ void cycle(CHIP8 *chip)
             switch(chip->op & 0x000F) 
             {
                 case 0x0000: // 0x00E0: Clear screen
-                    for (i = 0; i < 0x800; i++)
+                    for (i = 0; i < 64*32; i++)
                         chip->screen[i] = 0;
 
                     break;
 
                 case 0x000E: // 0x00EE: Return from sbr
-                    chip->pc = chip->stack[chip->sp];
-                    chip->sp--;
+                    chip->pc = chip->stack[chip->sp--];
                     break;
 
                 default:
                     printf("Unkown opcode: 0x%X\n", chip->op);
+                    break;
             }
             break;
 
@@ -148,8 +154,7 @@ void cycle(CHIP8 *chip)
 
         case 0x2000: // 0x2NNN: Execute sbr at NNN
             // Push current PC onto stack
-            chip->stack[chip->sp] = chip->pc;
-            chip->sp++;
+            chip->stack[chip->sp++] = chip->pc;
 
             // Jump to NNN
             chip->pc = NNN;
@@ -242,10 +247,14 @@ void cycle(CHIP8 *chip)
                 
                 default:
                     printf("Unkown opcode: 0x%X\n", chip->op);
+                    break;
             }
+            break;
 
         case 0x9000: // 0x9XY0: Skip if V[X] == V[Y]
-            if (chip->V[X] == chip->V[Y]) { chip->pc += 2; }
+            if (chip->V[X] == chip->V[Y])
+                chip->pc += 2;
+
             break;
 
         case 0xA000: // 0xANNN: Store NNN in I
@@ -263,47 +272,45 @@ void cycle(CHIP8 *chip)
         case 0xD000: // 0xDXYN: Draw pixels
             // Get x,y coordinate of the sprite
             // Modulo by screen width and height to stay within bounds
-            int x = chip->V[X] % 64, y = chip->V[Y] % 32;            
+            x = chip->V[X] % 64, y = chip->V[Y] % 32;            
 
             // Clear flag register
             chip->V[0xF] = 0;
+            
+            // Set draw flag
+            chip->draw = 1;
 
             // For N rows
             for (i = 0; i < N; i++)
             {
                 // Get the sprite byte addressed by I
-                sprite_byte = chip->memory[chip->I];
+                sprite_byte = chip->memory[chip->I + i];
                 
                 // For each bit in that byte
                 for (j = 0; j < 8; j++)
                 {
                     // 1 or 0, indicating if the current bit (starting from 7 through 0) is set
-                    sprite_bit = (sprite_byte & (1 << (7 - i))) >> (7 - i);
+                    sprite_bit = sprite_byte & (0x80 >> j);
 
-                    // If this bit is set AND the pixel at x,y is set turn the pixel off and set VF
+                    // If this bit is set AND the pixel at x+j,y+i is set turn the pixel off and set VF
                     // This is essentially modelling a collision detection
-                    if (sprite_bit && chip->screen[IX(x, y)])
+                    if (sprite_bit && chip->screen[IX(x+j,y+i)])
                     {
-                        chip->screen[IX(x, y)] = 0;
+                        chip->screen[IX(x+j,y+i)] = 0;
                         chip->V[0xF] = 1;
                     }
-
                     // If the sprite bit is on but the pixel isn't, that means we need to draw it to the screen
-                    if (sprite_bit && !chip->screen[IX(x, y)])
-                        chip->screen[IX(x, y)] = 1;
+                    else if (sprite_bit && !chip->screen[IX(x+j,y+i)])
+                        chip->screen[IX(x+j,y+i)] = 1;
 
                     // If we are off the side of the screen quit drawing
                     if (x >= 64)
                         break;
-            
-                    x++;
                 }
 
                 // If we are off the bottom of the screen quit drawing
                 if (y >= 32)
                     break;
-
-                y++;
             }
             break;
 
@@ -328,6 +335,7 @@ void cycle(CHIP8 *chip)
 
                 default:
                     printf("Uknown opcode: 0x%X\n", chip->op);
+                    break;
             }
             break;
 
@@ -393,11 +401,13 @@ void cycle(CHIP8 *chip)
 
                 default:
                     printf("Uknown opcode: 0x%X\n", chip->op);
+                    break;
             }
-
+            break;
 
         default:
             printf("Uknown opcode: 0x%X\n", chip->op);
+            break;
     }
 
     // Take care of timers
