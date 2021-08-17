@@ -28,7 +28,7 @@ int main(int argc, char **argv)
     init_chip(&chip);
 
     // Open ROM program file, get it's size
-    program_file = fopen("IBM Logo.ch8", "rb");
+    program_file = fopen("/Users/alexp/Dev/chip8emu/roms/IBM Logo.ch8", "rb");
     fseek(program_file, 0, SEEK_END);
     program_size = ftell(program_file);
     rewind(program_file);
