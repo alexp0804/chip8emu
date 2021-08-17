@@ -1,13 +1,13 @@
 
 #include <time.h>
 #include <stdlib.h>
-#include <stdio.h>
+
+#define WIDTH 64
+#define HEIGHT 32
 
 typedef uint8_t BYTE;
 typedef uint16_t WORD;
 
-#define WIDTH 64
-#define HEIGHT 32
 
 BYTE fonts[0x50] = {
     0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
@@ -30,20 +30,21 @@ BYTE fonts[0x50] = {
 
 typedef struct CHIP8
 {
-    WORD stack[0x10];    // 16-bit stack with max length of 16
-    BYTE V[0x10];        // 16 8-bit registers
-    BYTE memory[0x1000]; // 8-bit memory with 2048 addressable locations
-    BYTE screen[64*32];  // 64*32 resolution, each pixel is 1 or 0
-    BYTE keys[0x10];     // Hex-based input
-    WORD op;             // Current opcode
-    WORD pc;             // Program counter
-    WORD I;              // Index register
-    BYTE sp;             // Stack pointer
-    BYTE delay;          // Delay timer (both timers count downwards to zero)
-    BYTE sound;          // Sound timer
+    WORD stack[0x10];           // 16-bit stack with max length of 16
+    BYTE V[0x10];               // 16 8-bit registers
+    BYTE memory[0x1000];        // 8-bit memory with 2048 addressable locations
+    BYTE screen[WIDTH*HEIGHT];  // 64*32 resolution, each pixel is 1 or 0
+    BYTE keys[0x10];            // Hex-based input
+    WORD op;                    // Current opcode
+    WORD pc;                    // Program counter
+    WORD I;                     // Index register
+    BYTE sp;                    // Stack pointer
+    BYTE delay;                 // Delay timer (both timers count downwards to zero)
+    BYTE sound;                 // Sound timer
     BYTE draw;
 } CHIP8;
 
+// Convert a 2D index into a 1D index
 unsigned int IX(BYTE x, BYTE y)
 {
     return y * WIDTH + x;
@@ -65,7 +66,7 @@ void init_chip(CHIP8 *chip)
     chip->sound = 0;
 
     // Reset display
-    for (i = 0; i < 64*32; i++)
+    for (i = 0; i < WIDTH*HEIGHT; i++)
     {
         chip->screen[i] = 0;
     }
@@ -93,7 +94,7 @@ void init_chip(CHIP8 *chip)
 void fetch(CHIP8 *chip)
 {
     // Opcodes are words, stored in memory at PC and PC + 1.
-    // Shift (PC) and or with (PC + 1) to get opcode.
+    // Shift (PC) and OR with (PC + 1) to get opcode.
 
     chip->op = (chip->memory[chip->pc] << 0x8) | (chip->memory[chip->pc + 1]);
     chip->pc += 2;
@@ -101,9 +102,9 @@ void fetch(CHIP8 *chip)
 
 void cycle(CHIP8 *chip)
 {
-    WORD x, y, i, j, dec;
-    BYTE X, Y, N, NN, NNN, key, a, b;
-    BYTE sprite_byte, sprite_bit;
+    WORD x, y, i, j, dec, NNN;
+    BYTE X, Y, N, NN, key, a, b;
+    BYTE sprite_byte;
 
     srand(time(0));
 
@@ -133,7 +134,7 @@ void cycle(CHIP8 *chip)
             switch(chip->op & 0x000F) 
             {
                 case 0x0000: // 0x00E0: Clear screen
-                    for (i = 0; i < 64*32; i++)
+                    for (i = 0; i < WIDTH*HEIGHT; i++)
                         chip->screen[i] = 0;
 
                     break;
@@ -269,7 +270,42 @@ void cycle(CHIP8 *chip)
             chip->V[X] = (rand() % 256) & NN;
             break;
 
-        case 0xD000: // 0xDXYN: TODO Draw pixels
+        case 0xD000: // 0xDXYN: Draw pixels
+            // Get x,y coordinate of the sprite, modulo to say in bounds
+            x = chip->V[X] % WIDTH, y = chip->V[Y] % HEIGHT;            
+
+            // Set flags
+            chip->V[0xF] = 0;
+            chip->draw = 1;
+
+            // For N rows
+            for (i = 0; i < N; i++)
+            {
+                // Get the sprite byte addressed by I+i
+                sprite_byte = chip->memory[chip->I + i];
+
+                // For each bit in that byte
+                for (j = 0; j < 8; j++)
+                {
+                    // Zero or nonzero, indicating if the current bit (starting from 7 through 0) is set
+                    if (sprite_byte & (1 << (7 - j)))
+                    {
+                        // If we are about to turn a bit off, set the collision flag
+                        if (chip->screen[IX(x+j,y+i)])
+                            chip->V[0xF] = 1;
+
+                        chip->screen[IX(x+j,y+i)] ^= 1;
+                    }
+
+                    // If off the side of the screen quit drawing this row
+                    if (x+j >= WIDTH)
+                        break;
+
+                }
+                // If off the bottom of the screen quit drawing
+                if (y+i >= 32)
+                    break;
+            }
             break;
 
         case 0xE000:

@@ -1,7 +1,7 @@
 
+#include <SDL2/SDL.h>
 #include <stdio.h>
 #include "chip8.h"
-#include <SDL2/SDL.h>
 
 static int height = 32;
 static int width = 64;
@@ -22,7 +22,6 @@ int main(int argc, char **argv)
     SDL_CreateWindowAndRenderer(width, height, 0, &window, &renderer);
 
     // TODO: Set up input
-
 
     // Initialize chip
     init_chip(&chip);
