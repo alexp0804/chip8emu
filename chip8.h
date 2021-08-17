@@ -269,49 +269,7 @@ void cycle(CHIP8 *chip)
             chip->V[X] = (rand() % 256) & NN;
             break;
 
-        case 0xD000: // 0xDXYN: Draw pixels
-            // Get x,y coordinate of the sprite
-            // Modulo by screen width and height to stay within bounds
-            x = chip->V[X] % 64, y = chip->V[Y] % 32;            
-
-            // Clear flag register
-            chip->V[0xF] = 0;
-            
-            // Set draw flag
-            chip->draw = 1;
-
-            // For N rows
-            for (i = 0; i < N; i++)
-            {
-                // Get the sprite byte addressed by I
-                sprite_byte = chip->memory[chip->I + i];
-                
-                // For each bit in that byte
-                for (j = 0; j < 8; j++)
-                {
-                    // 1 or 0, indicating if the current bit (starting from 7 through 0) is set
-                    sprite_bit = sprite_byte & (0x80 >> j);
-
-                    // If this bit is set AND the pixel at x+j,y+i is set turn the pixel off and set VF
-                    // This is essentially modelling a collision detection
-                    if (sprite_bit && chip->screen[IX(x+j,y+i)])
-                    {
-                        chip->screen[IX(x+j,y+i)] = 0;
-                        chip->V[0xF] = 1;
-                    }
-                    // If the sprite bit is on but the pixel isn't, that means we need to draw it to the screen
-                    else if (sprite_bit && !chip->screen[IX(x+j,y+i)])
-                        chip->screen[IX(x+j,y+i)] = 1;
-
-                    // If we are off the side of the screen quit drawing
-                    if (x >= 64)
-                        break;
-                }
-
-                // If we are off the bottom of the screen quit drawing
-                if (y >= 32)
-                    break;
-            }
+        case 0xD000: // 0xDXYN: TODO Draw pixels
             break;
 
         case 0xE000:

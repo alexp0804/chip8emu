@@ -73,11 +73,11 @@ int main(int argc, char **argv)
                 if (chip.screen[IX(i,j)] == 1)
                 {
                     SDL_RenderDrawPoint(renderer, i, j);
-                    SDL_RenderPresent(renderer);
                 }
 
             }
         }
+        SDL_RenderPresent(renderer);
     
         // TODO: Store key press state (press and release)
     }
