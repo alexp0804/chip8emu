@@ -44,7 +44,6 @@ BYTE *read_program(FILE *f, char name[16], unsigned int *size)
     // Open program file and get it's size
     f = fopen(strcat(file_location, name), "rb");  
     *size = file_size(f);
-    printf("%d", *size);
 
     // Allocate array for program
     program = calloc(*size, sizeof(BYTE));
