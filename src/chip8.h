@@ -1,6 +1,7 @@
 
 #include <time.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 #define WIDTH 64
 #define HEIGHT 32
@@ -38,7 +39,7 @@ typedef struct CHIP8
     WORD op;                    // Current opcode
     WORD pc;                    // Program counter
     WORD I;                     // Index register
-    BYTE sp;                    // Stack pointer
+    int16_t sp;                    // Stack pointer
     BYTE delay;                 // Delay timer (both timers count downwards to zero)
     BYTE sound;                 // Sound timer
     BYTE draw;
@@ -58,11 +59,11 @@ void init_chip(CHIP8 *chip)
 {
     int i, j;
 
-    chip->pc = 0x200;       // PC starts at 0x200
-    chip->op = 0;           // Reset opcode
-    chip->I = 0;            // Reset index register
-    chip->sp = 0;           // Reset stack pointer
-    chip->delay = 0;        // Reset timers
+    chip->pc = 0x200;        // PC starts at 0x200
+    chip->op = 0;            // Reset opcode
+    chip->I = 0;             // Reset index register
+    chip->sp = -1;           // Reset stack pointer
+    chip->delay = 0;         // Reset timers
     chip->sound = 0;
 
     // Reset display
@@ -100,16 +101,58 @@ void fetch(CHIP8 *chip)
     chip->pc += 2;
 }
 
+void dump_memory(CHIP8 *chip){
+    printf("\n");
+    for (int i = 1; i < 0x1001; i++)
+    {
+        printf("%02X%s", chip->memory[i], (i % 16 == 0) ? "\n" : " ");
+    } 
+    printf("\n");
+}
+
+void debug_info(CHIP8 *chip)
+{
+    int i;
+
+    printf("\n\n\t   PC:\t0x%04X\n\t   OP:\t0x%04X\n\t    I:\t0x%04X\n\t", chip->pc-2, chip->op, chip->I);
+    fflush(stdout);
+    printf("   SP:\t%d\n    STACK:\t[", chip->sp);
+    fflush(stdout);
+    for (i = 0; i < 16; i++)
+        printf("0x%X%s", chip->stack[i], (i == 15) ? "]\n" : ", ");
+
+    printf("REGISTERS:\t");
+    fflush(stdout);
+    for (i = 0; i < 16; i++)
+    {
+        printf("%02X\t", chip->V[i]);
+        fflush(stdout);
+        if (i == 7)
+        {
+            printf("\n\t\t\t");
+            fflush(stdout);
+        }
+    }
+
+    printf("\n");
+    fflush(stdout);
+}
+
 void cycle(CHIP8 *chip)
 {
-    WORD x, y, i, j, dec, NNN;
+    WORD x, y, i, j, dec, NNN, temp;
     BYTE X, Y, N, NN, key, a, b;
     BYTE sprite_byte;
 
+    chip->draw = 0;
+
     srand(time(0));
+
 
     // Get next instruction
     fetch(chip);
+
+    debug_info(chip);
 
     // The values X, Y, N, NN, and NNN are always extracted the same way,
     // so doing it here will save a lot of code.
@@ -128,6 +171,7 @@ void cycle(CHIP8 *chip)
 
     // Start with just the most significant nibble.
     // We can identify *most* instructions with just this information.
+    printf("Decoded instruction: ");
     switch (chip->op & 0xF000)
     {
         case 0x0000: // 0x00EN
@@ -136,7 +180,6 @@ void cycle(CHIP8 *chip)
                 case 0x0000: // 0x00E0: Clear screen
                     for (i = 0; i < WIDTH*HEIGHT; i++)
                         chip->screen[i] = 0;
-
                     break;
 
                 case 0x000E: // 0x00EE: Return from sbr
@@ -155,26 +198,26 @@ void cycle(CHIP8 *chip)
 
         case 0x2000: // 0x2NNN: Execute sbr at NNN
             // Push current PC onto stack
-            chip->stack[chip->sp++] = chip->pc;
+            chip->stack[++chip->sp] = chip->pc;
 
             // Jump to NNN
             chip->pc = NNN;
             break;
 
-        case 0x3000: // 0x3XNN: Skip if V[X] != NN
-            if (chip->V[X] != NN)
-                chip->pc += 2;
-
-            break;
-
-        case 0x4000: // 0x4XNN: Skip if V[X] == NN
+        case 0x3000: // 0x3XNN: Skip if V[X] == NN
             if (chip->V[X] == NN)
                 chip->pc += 2;
 
             break;
 
-        case 0x5000: // 0x5XY0: Skip if V[X] != V[Y]
-            if (chip->V[X] != chip->V[Y])
+        case 0x4000: // 0x4XNN: Skip if V[X] != NN
+            if (chip->V[X] != NN)
+                chip->pc += 2;
+
+            break;
+
+        case 0x5000: // 0x5XY0: Skip if V[X] == V[Y]
+            if (chip->V[X] == chip->V[Y])
                 chip->pc += 2;
 
             break;
@@ -252,8 +295,8 @@ void cycle(CHIP8 *chip)
             }
             break;
 
-        case 0x9000: // 0x9XY0: Skip if V[X] == V[Y]
-            if (chip->V[X] == chip->V[Y])
+        case 0x9000: // 0x9XY0: Skip if V[X] != V[Y]
+            if (chip->V[X] != chip->V[Y])
                 chip->pc += 2;
 
             break;
@@ -264,10 +307,6 @@ void cycle(CHIP8 *chip)
         
         case 0xB000: // 0xBNNN: Jump to NNN + V[0]
             chip->pc = NNN + chip->V[0];
-            break;
-
-        case 0xC000: // 0xCXNN: Set V[X] to random with mask NN
-            chip->V[X] = (rand() % 256) & NN;
             break;
 
         case 0xD000: // 0xDXYN: Draw pixels
@@ -303,7 +342,7 @@ void cycle(CHIP8 *chip)
 
                 }
                 // If off the bottom of the screen quit drawing
-                if (y+i >= 32)
+                if (y+i >= HEIGHT)
                     break;
             }
             break;
@@ -374,11 +413,12 @@ void cycle(CHIP8 *chip)
                     dec = chip->V[X];
 
                     // Extract least sig. digit then divide by 10 to cut that digit off
-                    for (i = 2; i >= 0; i--)
-                    {
-                        chip->memory[chip->I + i] = (dec % 10);
-                        dec /= 10;
-                    }
+                    chip->memory[chip->I + 2] = (dec % 10);
+                    dec = dec / 10;
+                    chip->memory[chip->I + 1] = (dec % 10);
+                    dec = dec / 10;
+                    chip->memory[chip->I] = (dec % 10);
+
                     break;
 
                 case 0x0055: // 0xFX55: Store V[0] through V[X] in memory at I + (idx of reg)
@@ -388,7 +428,7 @@ void cycle(CHIP8 *chip)
                     break;
 
                 case 0x0065: // 0xFX65: Load V[0] through V[X] with memory at I + (idx of reg)
-                    for (i = 0; i < X; i++)
+                    for (i = 0; i <= X; i++)
                         chip->V[i] = chip->memory[chip->I + i];
 
                     break;
