@@ -1,6 +1,6 @@
 
 #include <SDL2/SDL.h>
-#include "chip8.h"
+#include "readprog.h"
 
 static int height = 320;
 static int width = 640;
@@ -50,23 +50,11 @@ BYTE test_prog[478] = {
     0x6B, 0x1A, 0xA2, 0x0E, 0xD8, 0xB4, 0xA2, 0x3E, 0xD9, 0xB4, 0x12
 };
 
-int main(int argc, char **argv)
+
+void fill(SDL_Rect rects[WIDTH*HEIGHT])
 {
-    CHIP8 chip;
-    FILE *program_file;
-    BYTE program_size, *program;
-    SDL_Event event;
-    SDL_Window *window;
-    SDL_Renderer *renderer;
-    SDL_Rect rects[WIDTH * HEIGHT];
-    int i, j, running = 1, color;
-
-    // Set up graphics
-    SDL_Init(SDL_INIT_VIDEO);
-    SDL_CreateWindowAndRenderer(width, height, 0, &window, &renderer);
-
-    // Fill the rects array with SDL rectangles, these will represent our pixels
-    // and will change height/width depending on the window size.
+    int i, j;
+    
     for (i = 0; i < WIDTH; i++)
     {
         for (j = 0; j < HEIGHT; j++)
@@ -77,27 +65,50 @@ int main(int argc, char **argv)
             rects[IX(i, j)].y = j * rects[IX(i, j)].h;
         }
     }
+}
+
+int main(int argc, char **argv)
+{
+    CHIP8 chip;
+    int i, j, running = 1, color;
+
+    SDL_Event event;
+    SDL_Window *window;
+    SDL_Renderer *renderer;
+    SDL_Rect rects[WIDTH * HEIGHT];
+
+    char file_name[16];
+    unsigned int program_size, start_addr = 0x200;
+    FILE *program_file;
+    BYTE *program;
+
+    if (argc > 1)
+        strcpy(file_name, argv[1]);
+    else
+        fprintf(stderr, "No program file described, try again\n");
+
+
+    // Set up graphics
+    SDL_Init(SDL_INIT_VIDEO);
+    SDL_CreateWindowAndRenderer(width, height, 0, &window, &renderer);
+
+    // Fill the rects array with SDL rectangles, these will represent the 64*32 pixels
+    fill(rects);
 
     // TODO: Set up input
+    // Do it here.
 
     // Initialize chip
     init_chip(&chip);
 
-    // Open ROM program file, get it's size
-    program_file = fopen("/Users/alexp/Dev/chip8emu/roms/IBM Logo.ch8", "rb");
-    fseek(program_file, 0, SEEK_END);
-    program_size = ftell(program_file);
-    rewind(program_file);
 
-    // Allocate the array to hold the program
-    program = calloc(program_size, sizeof(BYTE));
 
-    // Rewind file pointer and read into the program array
-    fread(program, sizeof(BYTE), program_size, program_file);
+    // Open program, read it, load it
+    program = read_program(program_file, file_name, &program_size);
+    load_program(chip.memory, start_addr, program, program_size);
 
-    // Load program into memory
-    for (i = 0; i < 478; i++)
-        chip.memory[i + 0x200] = test_prog[i];
+    // As the program is now in memory, we don't need to keep the allocated array
+    free(program);
 
     dump_memory(&chip);
 

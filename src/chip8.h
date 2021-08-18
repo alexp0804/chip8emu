@@ -39,7 +39,7 @@ typedef struct CHIP8
     WORD op;                    // Current opcode
     WORD pc;                    // Program counter
     WORD I;                     // Index register
-    int16_t sp;                    // Stack pointer
+    int16_t sp;                 // Stack pointer
     BYTE delay;                 // Delay timer (both timers count downwards to zero)
     BYTE sound;                 // Sound timer
     BYTE draw;
@@ -152,7 +152,7 @@ void cycle(CHIP8 *chip)
     // Get next instruction
     fetch(chip);
 
-    debug_info(chip);
+    // debug_info(chip);
 
     // The values X, Y, N, NN, and NNN are always extracted the same way,
     // so doing it here will save a lot of code.
@@ -171,7 +171,6 @@ void cycle(CHIP8 *chip)
 
     // Start with just the most significant nibble.
     // We can identify *most* instructions with just this information.
-    printf("Decoded instruction: ");
     switch (chip->op & 0xF000)
     {
         case 0x0000: // 0x00EN
