@@ -44,34 +44,37 @@ BYTE *read_program(FILE *f, char name[16], unsigned int *size)
     // Open program file and get it's size
     f = fopen(strcat(file_location, name), "rb");  
     *size = file_size(f);
+    printf("%d\n", *size);
 
     // Allocate array for program
-    program = calloc(*size, sizeof(BYTE));
+    program = (BYTE *) calloc(*size, sizeof(BYTE));
     if (!program)
         return NULL;
 
     // Read from f into program array
+    rewind(f);
     read_bytes = fread(program, sizeof(BYTE), *size, f);
+    printf("%d\n", read_bytes);
     fclose(f);
 
-    // If the number of bytes read is the same as the size of the file, everything went smoothly and we can return it back
-    if (read_bytes == *size)
+    // If fread doesnt read all bytes, an error occured
+    if (read_bytes < *size)
     {
-        return program;
+        free(program);
+        return NULL;
     }
 
     // If not, something went wrong when reading the file and the program is likely corrupt.
-    free(program);
-    return NULL;
+    return program;
 }
 
 // Loads the program into memory starting at addr
 // Assumes addr is a valid address and the program is small enough to fit in memory
-void load_program(BYTE *memory, WORD addr, BYTE *program, BYTE prog_size)
+void load_program(CHIP8 *chip, WORD addr, BYTE *program, BYTE prog_size)
 {
-    if (!memory || !program)
+    if (!chip || !program)
         return;
 
     for (int i = 0; i < prog_size; i++)
-        memory[i + addr] = program[i];
+        chip->memory[i + addr] = program[i];
 }
