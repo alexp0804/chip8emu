@@ -182,6 +182,10 @@ void cycle(CHIP8 *chip)
             chip->pc = NNN + chip->V[0];
             break;
 
+        case 0xC000: // 0xCXNN: Store random number in V[X]
+            chip->V[X] = (rand() % 255) & NN;
+            break;
+
         case 0xD000: // 0xDXYN: Draw pixels
             // Get x,y coordinate of the sprite, modulo to say in bounds
             x = chip->V[X] % WIDTH, y = chip->V[Y] % HEIGHT;            
