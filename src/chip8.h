@@ -25,7 +25,7 @@ typedef struct CHIP8
     int16_t sp;                 // Stack pointer
     BYTE delay;                 // Delay timer (both timers count down)
     BYTE sound;                 // Sound timer
-    BYTE draw;
+    BYTE draw;                  // Draw flag
 } CHIP8;
 
 
@@ -67,12 +67,15 @@ void init_chip(CHIP8 *chip)
     for (i = 0; i < WIDTH*HEIGHT; i++)
         chip->screen[i] = 0;
 
-    // Reset stack and registers
+    // Reset stack, registers and keys
     for (i = 0; i < 0x10; i++)
     {
         chip->stack[i] = 0;
         chip->V[i] = 0;
+        chip->keys[i] = 0;
     }
+
+
 
     // Reset memory
     for (i = 0; i < 0x1000; i++)

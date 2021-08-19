@@ -188,6 +188,7 @@ void cycle(CHIP8 *chip)
 
             // Set flags
             chip->V[0xF] = 0;
+            chip->draw = 1;
 
             // For N rows
             for (i = 0; i < N; i++)
@@ -285,9 +286,9 @@ void cycle(CHIP8 *chip)
                     dec = chip->V[X];
 
                     // Extract least sig. digit then cut that digit off
-                    for (int i = 2; i >= 0; i++)
+                    for (int i = 2; i >= 0; i--)
                     {
-                        chip->memory[chip->I + 2] = dec % 10;
+                        chip->memory[chip->I + i] = dec % 10;
                         dec /= 10;
                     }
 
