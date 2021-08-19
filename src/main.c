@@ -1,30 +1,17 @@
 
-#include <SDL2/SDL.h>
-#include "readprog.h"
+#include "debugtools.h"
 
-static int height = 320;
-static int width = 640;
-
-void fill(SDL_Rect rects[WIDTH*HEIGHT])
-{
-    int i, j;
-    
-    for (i = 0; i < WIDTH; i++)
-    {
-        for (j = 0; j < HEIGHT; j++)
-        {
-            rects[IX(i, j)].w = width / WIDTH;
-            rects[IX(i, j)].h = height / HEIGHT;
-            rects[IX(i, j)].x = i * rects[IX(i, j)].w;
-            rects[IX(i, j)].y = j * rects[IX(i, j)].h;
-        }
-    }
-}
+static int window_height = 320;
+static int window_width = 640;
 
 int main(int argc, char **argv)
 {
     CHIP8 chip;
-    int i, j, running = 1, color;
+
+    int i, j;
+    int success, color, running = 1;
+    uint64_t start, end;
+    float passed, delay;
 
     SDL_Event event;
     SDL_Window *window;
@@ -32,46 +19,48 @@ int main(int argc, char **argv)
     SDL_Rect rects[WIDTH * HEIGHT];
 
     char file_name[16];
-    unsigned int program_size, start_addr = 0x200;
+    unsigned int start_addr = 0x200;
     FILE *program_file;
-    BYTE *program;
 
+    // If no program specified, exit
     if (argc > 1)
         strcpy(file_name, argv[1]);
     else
-        fprintf(stderr, "No program file described, try again\n");
+        fprintf(stderr, "File not found, try again.\n");
 
 
     // Set up graphics
     SDL_Init(SDL_INIT_VIDEO);
-    SDL_CreateWindowAndRenderer(width, height, 0, &window, &renderer);
+    SDL_CreateWindowAndRenderer(window_width, 
+                                window_height, 
+                                0, 
+                                &window, 
+                                &renderer);
 
-    // Fill the rects array with SDL rectangles, these will represent the 64*32 pixels
-    fill(rects);
+    // Fill rects with SDL rectangles, these will represent the 64*32 pixels
+    for (i = 0; i < WIDTH; i++)
+    {
+        for (j = 0; j < HEIGHT; j++)
+        {
+            rects[IX(i, j)].w = window_width / WIDTH;
+            rects[IX(i, j)].h = window_height / HEIGHT;
+            rects[IX(i, j)].x = i * rects[IX(i, j)].w;
+            rects[IX(i, j)].y = j * rects[IX(i, j)].h;
+        }
+    }
 
     // TODO: Set up input
 
     // Initialize chip
     init_chip(&chip);
 
-    // Open program, read it, load it
-    program = read_program(program_file, file_name, &program_size);
-    if (!program)
-    {
-        fprintf(stderr, "Error loading program\n");
-        exit(-1);
-    }
-
-    load_program(&chip, start_addr, program, program_size);
-
-    // As the program is now in memory, we don't need to keep the allocated array
-    free(program);
-
-    // dump_memory(&chip);
+    // Load program, if failed, exit
+    if (!load_program(&chip, start_addr, program_file, file_name))
+        return 0;
 
     while (running)
     {
-        uint64_t start = SDL_GetPerformanceCounter();
+        start = SDL_GetPerformanceCounter();
 
         while (SDL_PollEvent(&event))
             if (event.type == SDL_QUIT)
@@ -93,17 +82,16 @@ int main(int argc, char **argv)
         // Update screen
         SDL_RenderPresent(renderer);
 
-        uint64_t end = SDL_GetPerformanceCounter();
+        end = SDL_GetPerformanceCounter();
 
         // TODO: Store key press state (press and release)
 
-        float elapsed = (end - start) / (float)SDL_GetPerformanceFrequency() * 1000.0f;
-        float delay = 16.666f - elapsed;
         // Limit FPS to 60
+        passed = (end - start) / (float)SDL_GetPerformanceFrequency() * 1000.0f;
+
+        delay = 16.666f - passed;
         if (delay >= 0)
-        {
-            SDL_Delay(floor(16.666f - elapsed));
-        }
+            SDL_Delay(floor(16.666f - passed));
     }
 
     SDL_DestroyRenderer(renderer);
