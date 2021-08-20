@@ -18,4 +18,4 @@ Simply clone this repository and run the Makefile with:
     
 It should create an executable. To load a ROM and run:
 
-    chip ROM_NAME
+    ./chip ROM_NAME
