@@ -9,7 +9,7 @@ void dump_memory(CHIP8 *chip)
 
     fprintf(memory_dump, "\n");
     for (i = 1; i < 0x1001; i++)
-        fprintf(memory_dump, "%02X%s", chip->memory[i], (i % 16 == 0) ? "\n" : " ");
+        fprintf(memory_dump, "%02X%s", chip->memory[i-1], (i % 16 == 0) ? "\n" : " ");
 
     fprintf(memory_dump, "\n");
 
@@ -21,7 +21,7 @@ void debug_info(CHIP8 *chip)
     int i;
 
     printf("\n\n");
-    printf("\t   PC:\t0x%04X\n", chip->pc - 2);
+    printf("\t   PC:\t0x%04X\n", chip->pc);
     printf("\t   OP:\t0x%04X\n", chip->op);
     printf("\t    I:\t0x%04X\n", chip->I);
     printf("\t   SP:\t%d\n", chip->sp);
@@ -35,7 +35,7 @@ void debug_info(CHIP8 *chip)
     {
         printf("%02X\t", chip->V[i]);
         if (i == 7)
-            printf("\n\t\t\t");
+            printf("\n\t\t");
     }
     printf("\n");
 }

@@ -13,10 +13,7 @@ unsigned int get_file_size(FILE *f)
 }
 
 // Read program from file and load directly into CHIP8 memory at specified address
-int load_program(CHIP8 *chip, 
-                  WORD addr, 
-                  FILE *f, 
-                  char name[16])
+int load_program(CHIP8 *chip, WORD addr, FILE *f, char name[16])
 {
     BYTE *program = chip->memory + addr;
     unsigned int size, bytes_read;

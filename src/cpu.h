@@ -8,15 +8,6 @@ unsigned int IX(BYTE x, BYTE y)
     return y * WIDTH + x;
 }
 
-void fetch(CHIP8 *chip)
-{
-    // Opcodes are words, stored in memory at PC and PC + 1.
-    // Shift (PC) and OR with (PC + 1) to get opcode.
-
-    chip->op = (chip->memory[chip->pc] << 0x8) | (chip->memory[chip->pc + 1]);
-    chip->pc += 2;
-}
-
 void cycle(CHIP8 *chip)
 {
     WORD x, y, i, j, dec, NNN, temp;
@@ -25,8 +16,11 @@ void cycle(CHIP8 *chip)
 
     srand(time(0));
 
-    // Get next instruction
-    fetch(chip);
+    // Fetch next instruction
+    chip->op = (chip->memory[chip->pc] << 0x8) | (chip->memory[chip->pc + 1]);
+    
+    // Move PC forward initially as it saves a lot of code
+    chip->pc += 2;
 
     // The values X, Y, N, NN, and NNN are always extracted the same way,
     // so doing it here will save a lot of code.
@@ -262,9 +256,13 @@ void cycle(CHIP8 *chip)
                     // When key is pressed, store it into V[X] and increment PC
                     for (i = 0; i < 0xF; i++)
                     {
-                        if (chip->keys[i] == 1)
+                        if (chip->keys[i])
                         {
                             chip->V[X] = i; // POSSIBLE ERROR: COULD BE i+1?
+
+                            // This process should only increment once per 
+                            // cpu cycle
+                            break;
                         }
                     }
                     break;
