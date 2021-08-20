@@ -1,44 +1,55 @@
+/* 
+    A CHIP8 Emulator (interpreter?) written in C.
+    Alexander Peterson
+    August 19 2021
+
+    Uses SDL for graphics/audio/input, and therefore are required to run.
+*/
 
 #include "sdltools.h"
+
+
+const int FPS = 60;
+const int frame_delay = 1000 / FPS;
 
 int main(int argc, char **argv)
 {
     CHIP8 chip;
-
-    int i, j;
-    int success, color, running = 1, idx;
-    int debugging, next_frame = 0, continuous_frames = 0;
+    char file_name[16];
+    FILE *program_file;
+    int i, running;
+    uint64_t start, end;
 
     SDL_Event event;
     SDL_Window *window;
     SDL_Renderer *renderer;
     SDL_Rect rects[WIDTH * HEIGHT];
-    uint64_t start, end;
-    float passed, delay;
 
-    char file_name[16];
-    FILE *program_file;
-    unsigned int start_addr = 0x200;
+    SDL_AudioSpec wav_spec;
+    SDL_AudioDeviceID device_ID;
+    uint32_t wav_length;
+    uint8_t *wav_buffer;
 
     // If no program specified, exit
     if (argc > 1)
-    {
         strcpy(file_name, argv[1]);
-        debugging = (argc == 3);
-    }
     else
     {
-        fprintf(stderr, "File not found, try again.\n");
+        fprintf(stderr, "File not specified, try again.\n");
         exit(-1);
     }
 
     // Set up graphics
-    SDL_Init(SDL_INIT_VIDEO);
+    SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
     SDL_CreateWindowAndRenderer(window_width, 
                                 window_height, 
                                 0, 
                                 &window, 
                                 &renderer);
+
+    // Set up audio
+    SDL_LoadWAV("rsrcs/buzz.wav", &wav_spec, &wav_buffer, &wav_length);
+    device_ID = SDL_OpenAudioDevice(NULL, 0, &wav_spec, NULL, 0);
 
     // Fill rects with SDL rectangles, these will represent the 64*32 pixels
     fill_rects(rects);
@@ -47,48 +58,43 @@ int main(int argc, char **argv)
     init_chip(&chip);
 
     // Load program, if failed, exit
-    if (!load_program(&chip, start_addr, program_file, file_name))
-        return 0;
+    if (!load_program(&chip, 0x200, program_file, file_name))
+    {
+        fprintf(stderr, "File not found, try again.\n");
+        exit(-1);
+    }
 
     // Emulation loop
+    running = 1;
     while (running)
     {
-        start = SDL_GetPerformanceCounter();
+        start = SDL_GetTicks();
 
         // Inputs (keypad, quit, debug info)
-        get_inputs(&chip, 
-                   &running,
-                   &next_frame, 
-                   &continuous_frames);
+        get_inputs(&chip, &running);
 
-        // Run a single CPU cycle
-        if (debugging)
-        {
-            if (next_frame || continuous_frames)
-            {
-                debug_info(&chip);
-                cycle(&chip);
-            }
-
-            next_frame = 0;
-        }
-        else 
+        // Run five CPU cycles
+        for (i = 0; i < 5; i++)
             cycle(&chip);
 
         update_screen(&chip, renderer, rects);
+        play_sound(&chip, device_ID, wav_length, wav_buffer);
 
-        // Limit FPS to 60
-        end = SDL_GetPerformanceCounter();
-        passed = (end - start) / (float)SDL_GetPerformanceFrequency() * 1000.0f;
-        delay = 16.666f - passed;
-        if (delay >= 0)
-            SDL_Delay(floor(16.666f - passed));
+        // Limit to 60 FPS
+        end = SDL_GetTicks();
+        if (frame_delay > (end - start))
+        {
+            SDL_Delay(frame_delay - (end - start));
+        }
     }
 
-    // Cleanup and go
+    // Cleanup and get out
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
+    SDL_CloseAudioDevice(device_ID);
+    SDL_FreeWAV(wav_buffer);
     SDL_Quit();
+
 
     return 0;
 }
