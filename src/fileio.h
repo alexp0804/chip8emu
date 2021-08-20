@@ -20,14 +20,18 @@ int load_program(CHIP8 *chip, WORD addr, FILE *f, char name[16])
     char file_location[32] = "./roms/\0";
 
     // Open program file and get it's size
-    f = fopen(strcat(file_location, name), "rb");  
-    size = get_file_size(f);
+    if ((f = fopen(strcat(file_location, name), "rb"))) 
+    {
+        size = get_file_size(f);
+        
+        // Read file into memory
+        bytes_read = fread(program, sizeof(BYTE), size, f);
+
+        fclose(f);
+
+        // If bytes read is the same as number of bytes in the file, success!
+        return (bytes_read == size);
+    }
     
-    // Read file into memory
-    bytes_read = fread(program, sizeof(BYTE), size, f);
-
-    fclose(f);
-
-    // If bytes read is the same as number of bytes in the file, success!
-    return (bytes_read == size);
+    return 0;
 }
