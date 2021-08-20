@@ -1,8 +1,8 @@
 /* 
-    A CHIP8 Emulator (interpreter?) written in C.
     Alexander Peterson
     August 19 2021
 
+    A CHIP8 Emulator (interpreter?) written in C.
     Uses SDL for graphics/audio/input, and therefore are required to run.
 */
 
@@ -77,6 +77,7 @@ int main(int argc, char **argv)
         for (i = 0; i < 5; i++)
             cycle(&chip);
 
+        // Draw pixels and play sounds
         update_screen(&chip, renderer, rects);
         play_sound(&chip, device_ID, wav_length, wav_buffer);
 
