@@ -22,9 +22,8 @@ void fill_rects(SDL_Rect rects[WIDTH*HEIGHT])
     }
 }
 
-// Polls inputs into the chip->keys value, or if not applicable, their 
-// respective flag
-void get_inputs(CHIP8 *chip, int *running, int *next, int *continuous)
+// Polls inputs into the chip->keys value
+void get_inputs(CHIP8 *chip, int *running)
 {
     SDL_Event event;
 
@@ -103,14 +102,6 @@ void get_inputs(CHIP8 *chip, int *running, int *next, int *continuous)
                     chip->keys[15] = 1;
                     break;
 
-                case SDL_SCANCODE_RSHIFT:
-                    *continuous = 1;
-                    break;
-                
-                case SDL_SCANCODE_SPACE:
-                    *next = 1;
-                    break;
-
                 default: break;
             }
         }
@@ -181,10 +172,6 @@ void get_inputs(CHIP8 *chip, int *running, int *next, int *continuous)
                 case SDL_SCANCODE_V:
                     chip->keys[15] = 0;
                     break;
-                
-                case SDL_SCANCODE_RSHIFT:
-                    *continuous = 0;
-                    break;
 
                 default: break;
             }
@@ -199,7 +186,7 @@ void update_screen(CHIP8 *chip,
 {
     int c, i, j;
 
-    if (!chip->draw)
+    if (!chip->draw_flag)
         return;
 
     for (i = 0; i < WIDTH; i++)
@@ -218,5 +205,19 @@ void update_screen(CHIP8 *chip,
     SDL_RenderPresent(renderer);
 
     // Reset draw flag
-    chip->draw = 0;
+    chip->draw_flag = 0;
+}
+
+void play_sound(CHIP8 *chip, 
+                SDL_AudioDeviceID device, 
+                uint32_t wav_length, 
+                uint8_t *wav_buffer)
+{
+    if (chip->sound_flag)
+    {
+        // Queue audio, then un-pause it
+        SDL_QueueAudio(device, wav_buffer, wav_length); 
+        SDL_PauseAudioDevice(device, 0);
+        chip->sound_flag = 0;
+    }
 }
