@@ -7,10 +7,10 @@ An implementation of a CHIP-8 emulator in C utilizing SDL for audio/graphics/inp
 CHIP8 is an interpreted programming language built in the 1970s. It is home to many ports of classic games such as PONG, SPACE INVADERS and TETRIS. Over the years, it has become a staple in the emulator developer community, thanks to the relatively simple structure of the system and low number of CPU opcodes. 
 
 <p float="center">
-<img src="rsrcs/tetris.png" width="450"/>
-<img src="rsrcs/spaceinvaders.png" width="450"/>
-<img src="rsrcs/connect4.png" width="450"/>
-<img src="rsrcs/brix.png" width="450"/>
+    <img src="rsrcs/tetris.png" width="350"/>
+    <img src="rsrcs/spaceinvaders.png" width="350"/>
+    <img src="rsrcs/connect4.png" width="350"/>
+    <img src="rsrcs/brix.png" width="350"/>
 </p>
 
 # Usage
