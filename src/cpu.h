@@ -14,13 +14,12 @@ void cycle(CHIP8 *chip)
     BYTE X, Y, N, NN, key, a, b;
     BYTE sprite_byte;
 
+    int pressed;
+
     srand(time(0));
 
     // Fetch next instruction
     chip->op = (chip->memory[chip->pc] << 0x8) | (chip->memory[chip->pc + 1]);
-    
-    // Move PC forward initially as it saves a lot of code
-    chip->pc += 2;
 
     // The values X, Y, N, NN, and NNN are always extracted the same way,
     // so doing it here will save a lot of code.
@@ -60,15 +59,15 @@ void cycle(CHIP8 *chip)
             break;
 
         case 0x1000: // 0x1NNN: Jump to NNN
-            chip->pc = NNN;
+            chip->pc = NNN - 2;
             break;
 
         case 0x2000: // 0x2NNN: Execute sbr at NNN
             // Push current PC onto stack
             chip->stack[++chip->sp] = chip->pc;
 
-            // Jump to NNN
-            chip->pc = NNN;
+            // Jump to NNN. Subtract 2 so we don't increment later
+            chip->pc = NNN - 2;
             break;
 
         case 0x3000: // 0x3XNN: Skip if V[X] == NN
@@ -117,43 +116,41 @@ void cycle(CHIP8 *chip)
                     break;                
                 
                 case 0x0004: // 0x8XY4: Add V[Y] to V[X], set flags
-                    a = chip->V[X], b = chip->V[Y];
-
                     // Detect overflow
-                    if ((a + b) < a || (a + b) < b)
+                    if ((chip->V[X] + chip->V[Y]) > 0xFF)
                         chip->V[0xF] = 1;
                     else
                         chip->V[0xF] = 0;
 
-                    chip->V[X] += b;
+                    chip->V[X] += chip->V[Y];
                     break;
                 
                 case 0x0005: // 0x8XY5: Set V[X] to V[X] - V[Y], set flags
                     if (chip->V[X] > chip->V[Y])
                         chip->V[0xF] = 1;
-                    else if (chip->V[X] < chip->V[Y])
+                    else
                         chip->V[0xF] = 0;
                     
                     chip->V[X] = chip->V[X] - chip->V[Y];
                     break;
                 
-                case 0x0006: // 0x8XY6: Store (V[Y] >> 1) in V[X], set flags
-                    chip->V[0xF] = chip->V[Y] & 0x1;
-                    chip->V[X] = chip->V[Y] >> 1;
+                case 0x0006: // 0x8XY6: Store (V[X] >> 1) in V[X], set flags
+                    chip->V[0xF] = chip->V[X] & 0x1;
+                    chip->V[X] = chip->V[X] >> 1;
                     break;
                 
                 case 0x0007: // 0x8XY7: Set V[X] to V[Y] - V[X], set flags
                     if (chip->V[Y] > chip->V[X])
                         chip->V[0xF] = 1;
-                    else if (chip->V[Y] < chip->V[X])
+                    else 
                         chip->V[0xF] = 0;
                     
                     chip->V[X] = chip->V[Y] - chip->V[X];
                     break;
                 
-                case 0x000E: // 0x8XYE: Store (V[Y] << 1) in V[X], set flags
-                    chip->V[0xF] = chip->V[Y] & 0x80;
-                    chip->V[X] = chip->V[Y] << 1;
+                case 0x000E: // 0x8XYE: Store (V[X] << 1) in V[X], set flags
+                    chip->V[0xF] = (chip->V[X] & 0x80) >> 7;
+                    chip->V[X] = chip->V[X] << 1;
                     break;
                 
                 default:
@@ -174,6 +171,7 @@ void cycle(CHIP8 *chip)
         
         case 0xB000: // 0xBNNN: Jump to NNN + V[0]
             chip->pc = NNN + chip->V[0];
+            chip->pc -= 2; // Don't increment PC
             break;
 
         case 0xC000: // 0xCXNN: Store random number in V[X]
@@ -186,7 +184,7 @@ void cycle(CHIP8 *chip)
 
             // Set flags
             chip->V[0xF] = 0;
-            chip->draw = 1;
+            chip->draw_flag = 1;
 
             // For N rows
             for (i = 0; i < N; i++)
@@ -224,7 +222,7 @@ void cycle(CHIP8 *chip)
                 case 0x009E: // 0xEX9E: If the key in V[X] is pressed, skip
                     key = chip->V[X];
 
-                    if (chip->keys[key] == 1)
+                    if (chip->keys[key])
                         chip->pc += 2;
 
                     break;
@@ -232,7 +230,7 @@ void cycle(CHIP8 *chip)
                 case 0x00A1: // 0xEXA1: If the key in V[X] isn't pressed, skip
                     key = chip->V[X];
 
-                    if (chip->keys[key] == 0)
+                    if (!chip->keys[key])
                         chip->pc += 2;
 
                     break;
@@ -251,20 +249,24 @@ void cycle(CHIP8 *chip)
                     break;
 
                 case 0x000A: // 0xFX0A: Stops PC unless a key is pressed
-                    chip->pc -= 2;
-
+                    pressed = 0;
                     // When key is pressed, store it into V[X] and increment PC
                     for (i = 0; i < 0xF; i++)
                     {
-                        if (chip->keys[i])
+                        if (chip->keys[i] && !pressed)
                         {
-                            chip->V[X] = i; // POSSIBLE ERROR: COULD BE i+1?
+                            chip->V[X] = i;
+                            pressed = 1;
 
                             // This process should only increment once per 
                             // cpu cycle
                             break;
                         }
                     }
+                    // If nothing is pressed, repeat this instruction
+                    if (!pressed)
+                        chip->pc -= 2;
+
                     break;
 
 
@@ -280,8 +282,8 @@ void cycle(CHIP8 *chip)
                     chip->I += chip->V[X];
                     break;
 
-                case 0x0029: // 0xFX29: Store V[X] in I
-                    chip->I = chip->V[X];
+                case 0x0029: // 0xFX29: I is set to the hex character in V[X]
+                    chip->I = (chip->V[X] & 0xF) * 5;
                     break;
 
                 case 0x0033: // 0xFX33: Store decimal equivalent of V[X] in I
@@ -319,16 +321,15 @@ void cycle(CHIP8 *chip)
             break;
     }
 
+    chip->pc += 2;
+
     // Take care of timers
     if (chip->delay > 0) 
         chip->delay--;
 
     if (chip->sound > 0)
     {
-        if (chip->sound == 1)
-        {
-            printf("Beep\n");
-        }
+        chip->sound_flag = (chip->sound == 1);
         chip->sound--;
     }
 }
